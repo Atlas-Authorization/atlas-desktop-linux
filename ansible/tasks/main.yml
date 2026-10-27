@@ -1,0 +1,63 @@
+---
+- name: Fail early without a break-glass account when PAM will be edited
+  ansible.builtin.assert:
+    that: atlas_break_glass_accounts | length > 0
+    fail_msg: "atlas_break_glass_accounts must name at least one local admin when atlas_apply_pam is true"
+  when: atlas_apply_pam | bool
+
+- name: Copy the package from the controller
+  ansible.builtin.copy:
+    src: "{{ atlas_package_path }}"
+    dest: "/tmp/{{ atlas_package_path | basename }}"
+    mode: "0644"
+  when: atlas_package_path | length > 0
+  register: atlas_pkg_local
+
+- name: Install the package (Debian family)
+  ansible.builtin.apt:
+    deb: "{{ atlas_package_url if atlas_package_url | length > 0 else atlas_pkg_local.dest }}"
+  when: ansible_os_family == "Debian"
+  notify: Reload systemd
+
+- name: Install the package (RedHat family)
+  ansible.builtin.dnf:
+    name: "{{ atlas_package_url if atlas_package_url | length > 0 else atlas_pkg_local.dest }}"
+    state: present
+    disable_gpg_check: true
+  when: ansible_os_family == "RedHat"
+  notify: Reload systemd
+
+- name: Install the package (Alpine)
+  ansible.builtin.command: "apk add --allow-untrusted {{ atlas_package_url if atlas_package_url | length > 0 else atlas_pkg_local.dest }}"
+  when: ansible_os_family == "Alpine"
+  changed_when: true
+
+- name: Enrol this machine
+  ansible.builtin.command:
+    argv: >-
+      {{ ['atlas-enroll', '--instance-url', atlas_instance_url, '--publishable-key', atlas_publishable_key,
+          '--instance-id', atlas_instance_id]
+         + (['--break-glass', atlas_break_glass_accounts | join(',')] if atlas_break_glass_accounts | length > 0 else [])
+         + (['--users', atlas_enrolled_users | join(',')] if atlas_enrolled_users | length > 0 else []) }}
+  environment:
+    ATLAS_ENROLL_CODE: "{{ atlas_enrol_code }}"
+    ATLAS_ENROLL_PIN: "{{ atlas_offline_pin }}"
+  args:
+    creates: /etc/atlas/desktop.json
+  no_log: true
+  when: atlas_enrol_code | length > 0
+
+- name: Show the PAM change that would be made
+  ansible.builtin.command: "atlas-pam-install --services '{{ atlas_pam_services | join(' ') }}'"
+  register: atlas_pam_preview
+  changed_when: false
+  failed_when: false
+  when: not (atlas_apply_pam | bool)
+
+- name: Apply the PAM change (keeps backups; all-or-nothing)
+  ansible.builtin.command: >-
+    atlas-pam-install --apply --services '{{ atlas_pam_services | join(' ') }}'
+    {% if atlas_pam_no_password_services | length > 0 %}--no-password '{{ atlas_pam_no_password_services | join(' ') }}'{% endif %}
+  when: atlas_apply_pam | bool
+  register: atlas_pam_apply
+  changed_when: "'installed for' in atlas_pam_apply.stdout and 'already installed' not in atlas_pam_apply.stdout"

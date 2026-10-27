@@ -1,0 +1,5 @@
+# Add this after the line that checks the password (on Debian/Ubuntu: after "@include common-auth"):
+auth       required       pam_atlas.so
+# Key-only ssh (AuthenticationMethods publickey,keyboard-interactive): there is no password for the stack to check, so add
+#   auth       required       pam_atlas.so no_password
+# and set in sshd_config:  UsePAM yes / KbdInteractiveAuthentication yes / AuthenticationMethods publickey,keyboard-interactive

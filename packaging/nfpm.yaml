@@ -1,0 +1,77 @@
+# Built three ways from env: PAM_DIR (where this distribution keeps PAM modules), VERSION, ARCH (amd64|arm64).
+name: atlas-desktop-mfa
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+section: admin
+priority: optional
+maintainer: Atlas <support@atlasauth.net>
+description: |
+  Atlas desktop-login MFA for Linux: a PAM module and agent that add push-with-number-matching, TOTP and an offline unlock
+  to sshd, sudo, login and the display manager. Does not change any PAM stack until you run atlas-pam-install.
+vendor: Atlas
+homepage: https://atlasauth.net
+license: MIT
+contents:
+  - src: ${SRC}/pam/build/pam_atlas.so
+    dst: ${PAM_DIR}/pam_atlas.so
+    file_info: { mode: 0755 }
+  - src: ${SRC}/bin/atlas-pam-helper
+    dst: /usr/libexec/atlas/atlas-pam-helper
+    file_info: { mode: 0755 }
+  - src: ${SRC}/bin/atlas-sync
+    dst: /usr/libexec/atlas/atlas-sync
+    file_info: { mode: 0755 }
+  - src: ${SRC}/bin/atlas-enroll
+    dst: /usr/sbin/atlas-enroll
+    file_info: { mode: 0755 }
+  - src: ${SRC}/scripts/pam-install.sh
+    dst: /usr/sbin/atlas-pam-install
+    file_info: { mode: 0755 }
+  - src: ${SRC}/scripts/pam-uninstall.sh
+    dst: /usr/sbin/atlas-pam-uninstall
+    file_info: { mode: 0755 }
+  - dst: /etc/atlas
+    type: dir
+    file_info: { mode: 0755 }
+  - dst: /var/lib/atlas
+    type: dir
+    file_info: { mode: 0700 }
+  - src: ${SRC}/packaging/atlas-sync.service
+    dst: /usr/lib/systemd/system/atlas-sync.service
+    packager: deb
+  - src: ${SRC}/packaging/atlas-sync.timer
+    dst: /usr/lib/systemd/system/atlas-sync.timer
+    packager: deb
+  - src: ${SRC}/packaging/atlas-sync.service
+    dst: /usr/lib/systemd/system/atlas-sync.service
+    packager: rpm
+  - src: ${SRC}/packaging/atlas-sync.timer
+    dst: /usr/lib/systemd/system/atlas-sync.timer
+    packager: rpm
+  - src: ${SRC}/packaging/atlas-sync.cron
+    dst: /etc/periodic/hourly/atlas-sync
+    packager: apk
+    file_info: { mode: 0755 }
+  - src: ${SRC}/packaging/pam.d-snippets
+    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets
+    type: tree
+  - src: ${SRC}/README.md
+    dst: /usr/share/doc/atlas-desktop-mfa/README.md
+  - src: ${SRC}/ROLLBACK.md
+    dst: /usr/share/doc/atlas-desktop-mfa/ROLLBACK.md
+  - src: ${SRC}/SECURITY.md
+    dst: /usr/share/doc/atlas-desktop-mfa/SECURITY.md
+  - src: ${SRC}/LICENSE
+    dst: /usr/share/doc/atlas-desktop-mfa/LICENSE
+scripts:
+  preinstall: ${SRC}/packaging/preinstall.sh
+  postinstall: ${SRC}/packaging/postinstall.sh
+  preremove: ${SRC}/packaging/preremove.sh
+overrides:
+  deb:
+    depends: [libpam0g]
+  rpm:
+    depends: [pam]
+  apk:
+    depends: [linux-pam]

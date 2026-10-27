@@ -1,0 +1,2 @@
+# After the last auth line in /etc/pam.d/login (console and getty logins):
+auth       required       pam_atlas.so

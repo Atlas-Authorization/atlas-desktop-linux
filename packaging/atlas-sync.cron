@@ -1,0 +1,4 @@
+#!/bin/sh
+# Alpine (no systemd): busybox periodic hourly job.
+[ -f /etc/atlas/desktop.json ] && exec /usr/libexec/atlas/atlas-sync
+exit 0

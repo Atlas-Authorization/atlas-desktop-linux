@@ -1,0 +1,127 @@
+name: ci
+on:
+  push:
+    branches: [main, "ci/**"]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: false
+      - name: Resolve modules
+        working-directory: helper
+        run: |
+          go mod tidy
+          go mod verify
+      - name: Vet
+        working-directory: helper
+        run: go vet ./...
+      - name: Test (race detector, vectors, fake server, helper protocol)
+        working-directory: helper
+        run: go test -race -count=1 -v ./...
+      - name: Build static binaries for amd64 and arm64
+        working-directory: helper
+        run: |
+          for arch in amd64 arm64; do
+            mkdir -p ../out/bin-$arch
+            for cmd in atlas-pam-helper atlas-sync atlas-enroll; do
+              CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath -ldflags "-s -w" -o ../out/bin-$arch/$cmd ./cmd/$cmd
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bin
+          path: out/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: go-sum
+          path: |
+            helper/go.sum
+            helper/go.mod
+
+  linux:
+    needs: go
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: deb-amd64, runner: ubuntu-latest, image: "ubuntu:22.04", fmt: deb, arch: amd64, nfpmarch: x86_64, pamdir: /usr/lib/x86_64-linux-gnu/security,
+              setup: "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libpam0g-dev libpam-modules libpam-runtime diffutils", install: "dpkg -i" }
+          - { name: deb-arm64, runner: ubuntu-24.04-arm, image: "ubuntu:22.04", fmt: deb, arch: arm64, nfpmarch: arm64, pamdir: /usr/lib/aarch64-linux-gnu/security,
+              setup: "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc make libpam0g-dev libpam-modules libpam-runtime diffutils", install: "dpkg -i" }
+          - { name: rpm-amd64, runner: ubuntu-latest, image: "rockylinux:9", fmt: rpm, arch: amd64, nfpmarch: x86_64, pamdir: /usr/lib64/security,
+              setup: "dnf install -y -q gcc make pam-devel diffutils findutils", install: "rpm -i" }
+          - { name: rpm-arm64, runner: ubuntu-24.04-arm, image: "rockylinux:9", fmt: rpm, arch: arm64, nfpmarch: arm64, pamdir: /usr/lib64/security,
+              setup: "dnf install -y -q gcc make pam-devel diffutils findutils", install: "rpm -i" }
+          - { name: apk-amd64, runner: ubuntu-latest, image: "alpine:3.20", fmt: apk, arch: amd64, nfpmarch: x86_64, pamdir: /lib/security,
+              setup: "apk add --no-cache gcc musl-dev make linux-pam linux-pam-dev bash diffutils", install: "apk add --allow-untrusted" }
+          - { name: apk-arm64, runner: ubuntu-24.04-arm, image: "alpine:3.20", fmt: apk, arch: arm64, nfpmarch: arm64, pamdir: /lib/security,
+              setup: "apk add --no-cache gcc musl-dev make linux-pam linux-pam-dev bash diffutils", install: "apk add --allow-untrusted" }
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bin
+          path: out
+      - name: Version
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"; else echo "VERSION=0.1.0" >> "$GITHUB_ENV"; fi
+          mkdir -p bin && cp out/bin-${{ matrix.arch }}/* bin/ && chmod +x bin/*
+      - name: Build, unit-test and integration-test the PAM module in ${{ matrix.image }} (real PAM stack, fake helper, as root)
+        run: |
+          docker run --rm -v "$PWD":/src -w /src ${{ matrix.image }} sh -c '
+            set -e
+            ${{ matrix.setup }}
+            make -C pam
+            make -C pam test
+            make -C pam itest
+            bash pam/tests/install_test.sh
+          '
+      - name: Install nfpm
+        run: |
+          curl -fsSL -o nfpm.tgz "https://github.com/goreleaser/nfpm/releases/download/v2.41.0/nfpm_2.41.0_Linux_${{ matrix.nfpmarch }}.tar.gz"
+          tar -xzf nfpm.tgz nfpm
+          ./nfpm --version
+      - name: Build the ${{ matrix.fmt }} package
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" pam
+          mkdir -p dist
+          SRC="$PWD" PAM_DIR=${{ matrix.pamdir }} VERSION="$VERSION" ARCH=${{ matrix.arch }} ./nfpm package -f packaging/nfpm.yaml -p ${{ matrix.fmt }} -t dist/
+          ls -l dist
+      - name: Install, check and remove the package in ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD/dist":/pkg -v "$PWD/pam/tests":/tests ${{ matrix.image }} sh -c '
+            set -e
+            ${{ matrix.setup }}
+            ${{ matrix.install }} /pkg/*.${{ matrix.fmt }}
+            sh /tests/pkg_test.sh ${{ matrix.fmt }} ${{ matrix.pamdir }}
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pkg-${{ matrix.name }}
+          path: dist/*.${{ matrix.fmt }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: pkg-*
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body: "Unsigned packages. Verify the checksums, enrol, then run atlas-pam-install. See ROLLBACK.md before changing any PAM stack."
