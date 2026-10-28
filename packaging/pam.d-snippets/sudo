@@ -1,0 +1,2 @@
+# After "@include common-auth" in /etc/pam.d/sudo:
+auth       required       pam_atlas.so

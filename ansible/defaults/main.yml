@@ -1,0 +1,16 @@
+---
+# Where to fetch the package from (a URL or a path on the controller's copy of the release assets).
+atlas_package_url: ""
+atlas_package_path: ""            # alternative: a local file on the controller, copied to the host
+atlas_instance_url: ""            # https://auth.example.com
+atlas_publishable_key: ""
+atlas_instance_id: ""
+# Enrolment needs a one-time code per machine; pass it per host (vault it): atlas_enrol_code
+atlas_enrol_code: ""
+atlas_offline_pin: ""             # 6-12 digits, per host; vault it
+atlas_break_glass_accounts: []    # e.g. ["emergency-admin"]; REQUIRED when atlas_apply_pam is true
+atlas_enrolled_users: []          # empty = every local account
+atlas_pam_services: ["sshd", "sudo", "login"]
+atlas_pam_no_password_services: []
+# Editing the PAM stacks is opt-in. false = install and enrol only.
+atlas_apply_pam: false

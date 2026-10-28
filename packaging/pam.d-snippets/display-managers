@@ -1,0 +1,7 @@
+GDM (gdm-password) and LightDM (lightdm) include the distribution's common stack:
+  Debian/Ubuntu:  they use "@include common-auth". Put the Atlas line into /etc/pam.d/gdm-password and /etc/pam.d/lightdm,
+                  after that include, not into common-auth (common-auth also serves cron-like services without a screen).
+  Fedora/RHEL:    system-auth/password-auth hold "auth sufficient pam_unix.so": a success there ends the stack, so a line placed
+                  after it never runs. Use an authselect custom profile that makes pam_unix "required" and then lists pam_atlas.so,
+                  or edit the service file (gdm-password) so it lists its own pam_unix.so required line followed by pam_atlas.so.
+The graphical prompt shows the push number and the code field through the normal PAM conversation. Test on a second TTY first.

@@ -1,0 +1,15 @@
+[Unit]
+Description=Atlas desktop MFA sync (offline bundle and policy refresh)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/atlas/desktop.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/atlas/atlas-sync
+User=root
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/atlas
+ProtectHome=yes
+PrivateTmp=yes
