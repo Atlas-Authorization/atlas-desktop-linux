@@ -98,24 +98,6 @@ jobs:
           sed -e "s#\${SRC}#$PWD#g" -e "s#\${PAM_DIR}#${{ matrix.pamdir }}#g" packaging/nfpm.yaml > nfpm.resolved.yaml
           VERSION="$VERSION" ARCH=${{ matrix.arch }} ./nfpm package -f nfpm.resolved.yaml -p ${{ matrix.fmt }} -t dist/
           ls -l dist
-      - name: apk install bisect (diagnostic)
-        if: always() && matrix.fmt == 'apk' && matrix.arch == 'amd64'
-        continue-on-error: true
-        run: |
-          python3 - <<'PY'
-          import yaml, copy
-          d = yaml.safe_load(open("nfpm.resolved.yaml"))
-          v = {}
-          a = copy.deepcopy(d); a.pop("scripts"); v["noscripts"] = a
-          b = copy.deepcopy(d); b["contents"] = [c for c in b["contents"] if c.get("type") != "dir"]; v["nodirs"] = b
-          c = copy.deepcopy(d); c["contents"] = [x for x in c["contents"] if x.get("type") != "tree"]; v["notree"] = c
-          e = copy.deepcopy(d); e["contents"] = [x for x in e["contents"] if "periodic" not in x["dst"]]; v["nocron"] = e
-          for k, x in v.items(): yaml.safe_dump(x, open("v-%s.yaml" % k, "w"))
-          PY
-          for v in noscripts nodirs notree nocron; do
-            mkdir -p "dv-$v"; VERSION=0.1.0 ARCH=amd64 ./nfpm package -f "v-$v.yaml" -p apk -t "dv-$v/"
-            docker run --rm -v "$PWD/dv-$v":/pkg alpine:3.20 sh -c 'apk add --allow-untrusted /pkg/*.apk >/dev/null 2>&1 && echo "VARIANT '"$v"' OK" || echo "VARIANT '"$v"' FAILS"'
-          done
       - name: List the package contents
         if: always()
         run: |
