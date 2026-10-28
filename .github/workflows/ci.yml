@@ -94,7 +94,9 @@ jobs:
         run: |
           sudo chown -R "$(id -u):$(id -g)" pam
           mkdir -p dist
-          SRC="$PWD" PAM_DIR=${{ matrix.pamdir }} VERSION="$VERSION" ARCH=${{ matrix.arch }} ./nfpm package -f packaging/nfpm.yaml -p ${{ matrix.fmt }} -t dist/
+          # nfpm does not expand env vars in contents paths: resolve SRC and PAM_DIR ourselves.
+          sed -e "s#\${SRC}#$PWD#g" -e "s#\${PAM_DIR}#${{ matrix.pamdir }}#g" packaging/nfpm.yaml > nfpm.resolved.yaml
+          VERSION="$VERSION" ARCH=${{ matrix.arch }} ./nfpm package -f nfpm.resolved.yaml -p ${{ matrix.fmt }} -t dist/
           ls -l dist
       - name: Install, check and remove the package in ${{ matrix.image }}
         run: |
