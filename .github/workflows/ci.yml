@@ -98,6 +98,10 @@ jobs:
           sed -e "s#\${SRC}#$PWD#g" -e "s#\${PAM_DIR}#${{ matrix.pamdir }}#g" packaging/nfpm.yaml > nfpm.resolved.yaml
           VERSION="$VERSION" ARCH=${{ matrix.arch }} ./nfpm package -f nfpm.resolved.yaml -p ${{ matrix.fmt }} -t dist/
           ls -l dist
+      - name: List the package contents
+        if: always()
+        run: |
+          for f in dist/*; do echo "== $f"; case "$f" in *.apk) gzip -dc "$f" | tar -tvf - 2>&1 | head -60;; *.deb) dpkg-deb -c "$f";; esac; done
       - name: Install, check and remove the package in ${{ matrix.image }}
         run: |
           docker run --rm -v "$PWD/dist":/pkg -v "$PWD/pam/tests":/tests ${{ matrix.image }} sh -c '
