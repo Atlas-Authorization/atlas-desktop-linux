@@ -23,9 +23,10 @@ func eq(t *testing.T, got []string, want ...string) {
 
 func TestBeginValidation(t *testing.T) {
 	e := newEnv(t)
-	for _, l := range []string{"BEGIN alice", "BEGIN -alice sshd", "BEGIN al ice sshd", "BEGIN alice ssh/d", "BEGIN a;b sshd", "HELLO", "BEGIN alice sshd extra"} {
+	for _, l := range []string{"BEGIN alice", "BEGIN -alice sshd", "BEGIN al ice sshd", "BEGIN alice ssh/d", "BEGIN a;b sshd", "BEGIN alice sshd extra"} {
 		eq(t, e.session(l), "DENY bad request")
 	}
+	eq(t, e.session("HELLO"), "REJECT unknown command")
 	eq(t, e.session("BEGIN alice sshd", "BEGIN alice sshd"), "CHALLENGE", "DENY bad request")
 	eq(t, e.session("CODE 123456"), "REJECT bad request") // before BEGIN
 	eq(t, e.session("BEGIN alice sshd\nCODE 123456\n"+strings.Repeat("A", 300)), "CHALLENGE", "OK", "DENY bad request")
