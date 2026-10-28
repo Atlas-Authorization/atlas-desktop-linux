@@ -53,9 +53,15 @@ contents:
     dst: /etc/periodic/hourly/atlas-sync
     packager: apk
     file_info: { mode: 0755 }
-  - src: ${SRC}/packaging/pam.d-snippets
-    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets
-    type: tree
+  # Listed one by one: apk-tools rejects the directory entry nfpm writes for a type: tree.
+  - src: ${SRC}/packaging/pam.d-snippets/display-managers
+    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets/display-managers
+  - src: ${SRC}/packaging/pam.d-snippets/login
+    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets/login
+  - src: ${SRC}/packaging/pam.d-snippets/sshd
+    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets/sshd
+  - src: ${SRC}/packaging/pam.d-snippets/sudo
+    dst: /usr/share/doc/atlas-desktop-mfa/pam.d-snippets/sudo
   - src: ${SRC}/README.md
     dst: /usr/share/doc/atlas-desktop-mfa/README.md
   - src: ${SRC}/ROLLBACK.md
