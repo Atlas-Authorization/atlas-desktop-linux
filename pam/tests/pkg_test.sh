@@ -25,10 +25,14 @@ check "helper is a static binary" '! ldd /usr/libexec/atlas/atlas-pam-helper 2>&
 [ "$FMT" = apk ] || check "sync timer/unit shipped" '[ -f /usr/lib/systemd/system/atlas-sync.timer ]'
 [ "$FMT" != apk ] || check "hourly job shipped" '[ -x /etc/periodic/hourly/atlas-sync ]'
 
-# Removal is refused while a PAM file still names the module.
+# Removal is refused while a PAM file still names the module (apk cannot refuse: there it must clean the stack instead).
 echo "auth required pam_atlas.so" > /etc/pam.d/atlas-pkg-test
-out=$(remove_pkg 2>&1); echo "removal output: $out"
-check "removal refused while pam.d still uses the module" 'installed && [ -f "$PAMDIR/pam_atlas.so" ]'
+remove_pkg >/dev/null 2>&1
+if [ "$FMT" = apk ]; then
+  check "apk removal leaves no PAM file naming the module" '! grep -rqE "^[^#]*pam_atlas" /etc/pam.d'
+else
+  check "removal refused while pam.d still uses the module" 'installed && [ -f "$PAMDIR/pam_atlas.so" ]'
+fi
 rm -f /etc/pam.d/atlas-pkg-test
 remove_pkg >/dev/null 2>&1
 check "removal succeeds once pam.d is clean" '! installed && [ ! -f "$PAMDIR/pam_atlas.so" ] && [ ! -f /usr/libexec/atlas/atlas-pam-helper ]'

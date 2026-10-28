@@ -80,4 +80,4 @@ overrides:
   rpm:
     depends: [pam]
   apk:
-    depends: [linux-pam]
+    depends: [linux-pam, bash]
