@@ -112,7 +112,7 @@ int atlas_authenticate(const atlas_io *io, const char *user, const char *service
     if (xchg(io, "PUSH", ATLAS_BEGIN_TIMEOUT_MS, &r) != 0) return 0;
     if (r.kind == ATLAS_R_NUMBER) {
       char msg[ATLAS_LINE_MAX];
-      snprintf(msg, sizeof msg, "Atlas: approve the sign-in on your phone and pick %s.", r.text);
+      snprintf(msg, sizeof msg, "Atlas: approve the sign-in on your phone and pick %.32s.", r.text);
       io->info(io->ctx, msg);
       char line[ATLAS_LINE_MAX];
       if (io->recv(io->ctx, line, sizeof line, ATLAS_PUSH_TIMEOUT_MS) != 0) return 0;
