@@ -27,7 +27,7 @@ check "helper is a static binary" '! ldd /usr/libexec/atlas/atlas-pam-helper 2>&
 
 # Removal is refused while a PAM file still names the module.
 echo "auth required pam_atlas.so" > /etc/pam.d/atlas-pkg-test
-remove_pkg >/dev/null 2>&1
+out=$(remove_pkg 2>&1); echo "removal output: $out"
 check "removal refused while pam.d still uses the module" 'installed && [ -f "$PAMDIR/pam_atlas.so" ]'
 rm -f /etc/pam.d/atlas-pkg-test
 remove_pkg >/dev/null 2>&1

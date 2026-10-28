@@ -1,6 +1,7 @@
 #!/bin/sh
 # Removing the module while a PAM stack still names it would make every login on that service fail, root included.
 # So removal is refused until the stacks are clean. Upgrades pass ($1 = upgrade on deb, 1 on rpm).
+echo "atlas: preremove args: $*" >&2
 case "${1:-}" in upgrade|failed-upgrade|deconfigure|1) exit 0;; esac
 [ "${ATLAS_FORCE_REMOVE:-}" = 1 ] && exit 0
 refs=$(grep -lE '^[^#]*pam_atlas\.so' /etc/pam.d/* 2>/dev/null | tr '\n' ' ')
